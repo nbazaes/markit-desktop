@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-deep: #1e1e24;
+  --color-bg-surface: #26262e;
+  --color-bg-raised: #343440;
+  --color-border: #3a3a46;
+  --color-border-hover: #4a4a56;
+  --color-accent: #c7924b;
+  --color-accent-hover: #d4a85c;
+  --color-accent-pressed: #a6763b;
+  --color-accent-dim: #5a4620;
+  --color-text-primary: #e8e4d9;
+  --color-text-secondary: #b0aca5;
+  --color-text-muted: #87878d;
+  --color-text-dim: #5a5a64;
+  --color-success: #6aab73;
+  --color-error: #c95f5f;
+  --color-warning: #c7924b;
+
+  --font-mono: "SF Mono", "Consolas", "Monaco", monospace;
+}
+
+[data-theme="light"] {
+  --color-bg-deep: #fafaf7;
+  --color-bg-surface: #f5f5f0;
+  --color-bg-raised: #e8e8e0;
+  --color-border: #e0e0d8;
+  --color-border-hover: #c0c0b8;
+  --color-accent: #a6763b;
+  --color-accent-hover: #c7924b;
+  --color-text-primary: #2d2d2a;
+  --color-text-secondary: #5a5a52;
+  --color-text-muted: #878780;
+  --color-text-dim: #a0a098;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background-color: var(--color-bg-deep);
+  color: var(--color-text-primary);
+}

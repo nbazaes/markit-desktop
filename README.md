@@ -36,8 +36,8 @@ Convert PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, HTML
 ### pip (any OS with Python 3.10+)
 
 ```bash
-pip install markitdown-gui
-markitdown-gui
+pip install markit-desktop
+markit-desktop
 ```
 
 ### Linux
@@ -45,9 +45,9 @@ markitdown-gui
 | Format | Command |
 |--------|---------|
 | **AppImage** | Download from [Releases](https://github.com/microsoft/markitdown/releases), `chmod +x` and run |
-| **Debian/Ubuntu** | `sudo dpkg -i markitdown-gui_*.deb` |
-| **Fedora/RHEL** | `sudo rpm -i markitdown-gui-*.rpm` |
-| **Arch (AUR)** | `yay -S markitdown-gui` |
+| **Debian/Ubuntu** | `sudo dpkg -i markit-desktop_*.deb` |
+| **Fedora/RHEL** | `sudo rpm -i markit-desktop-*.rpm` |
+| **Arch (AUR)** | `yay -S markit-desktop` |
 
 ### Windows
 
@@ -66,7 +66,7 @@ pip install -e "markitdown[all]"
 
 cd ../markitdown-gui
 pip install -e .
-markitdown-gui
+markit-desktop
 ```
 
 ### Standalone Binary

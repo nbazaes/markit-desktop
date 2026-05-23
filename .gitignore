@@ -1,20 +1,5 @@
-__pycache__/
-*.py[cod]
-*.egg-info/
+node_modules/
 dist/
-build/
-*.AppImage
-*.deb
-*.rpm
-*.dmg
-*.exe
-*.egg
-.env
-.venv/
-venv/
+target/
+*.log
 .DS_Store
-Thumbs.db
-
-# Keep packaging scripts
-!build/packages/
-!build/pyinstaller.spec
