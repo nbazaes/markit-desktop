@@ -1,9 +1,10 @@
-use tauri::Manager;
+mod commands;
+mod converter;
+mod settings;
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use settings::Settings;
+use std::sync::Mutex;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -11,7 +12,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .setup(|app| {
+            let settings = Settings::load(&app.handle());
+            app.manage(Mutex::new(settings));
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::convert_files,
+            commands::get_settings,
+            commands::set_settings,
+            commands::select_output_dir,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
