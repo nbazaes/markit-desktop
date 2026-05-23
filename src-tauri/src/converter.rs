@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Command, Stdio};
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::ShellExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversionInput {
@@ -75,181 +76,169 @@ pub async fn run_conversion(
     let input_json = serde_json::to_string(&input)
         .map_err(|e| format!("Failed to serialize input: {}", e))?;
 
-    let sidecar_path = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Failed to get resource directory: {}", e))?
-        .join("sidecars")
-        .join("markit-convert");
+    let shell = app.shell();
+    let sidecar = shell
+        .sidecar("markit-convert")
+        .map_err(|e| format!("Failed to get sidecar: {}", e))?;
 
-    if !sidecar_path.exists() {
-        return Err(format!(
-            "Sidecar not found at {:?}. Please build it first with: cd python-sidecar && pyinstaller convert.spec",
-            sidecar_path
-        ));
-    }
-
-    let mut child = Command::new(&sidecar_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+    let (mut rx, mut child) = sidecar
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(input_json.as_bytes())
-            .map_err(|e| format!("Failed to write to sidecar stdin: {}", e))?;
-    }
+    child
+        .write(input_json.as_bytes())
+        .map_err(|e| format!("Failed to write to sidecar stdin: {}", e))?;
 
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "Failed to capture sidecar stdout".to_string())?;
-
-    let reader = BufReader::new(stdout);
     let mut results = Vec::new();
+    let buffer = Mutex::new(String::new());
 
-    for line in reader.lines() {
-        let line = line.map_err(|e| format!("Failed to read sidecar output: {}", e))?;
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stdout(bytes) => {
+                let line = String::from_utf8_lossy(&bytes);
+                let mut buf = buffer.lock().unwrap();
+                buf.push_str(&line);
+                
+                while let Some(newline_pos) = buf.find('\n') {
+                    let line_str = buf[..newline_pos].trim().to_string();
+                    *buf = buf[newline_pos + 1..].to_string();
 
-        if line.trim().is_empty() {
-            continue;
+                    if line_str.is_empty() {
+                        continue;
+                    }
+
+                    let event: SidecarEvent = match serde_json::from_str(&line_str) {
+                        Ok(e) => e,
+                        Err(e) => {
+                            eprintln!("Failed to parse sidecar event: {} - Line: {}", e, line_str);
+                            continue;
+                        }
+                    };
+
+                    let progress = match &event {
+                        SidecarEvent::Started {
+                            file,
+                            index,
+                            total,
+                        } => ConversionProgress {
+                            event_type: "started".to_string(),
+                            file: Some(file.clone()),
+                            index: Some(*index),
+                            total: Some(*total),
+                            markdown: None,
+                            output_path: None,
+                            error: None,
+                            success: None,
+                            failed: None,
+                        },
+                        SidecarEvent::Finished {
+                            file,
+                            index,
+                            markdown,
+                            output_path,
+                        } => {
+                            results.push(ConversionResult {
+                                file: file.clone(),
+                                markdown: markdown.clone(),
+                                error: None,
+                                output_path: if output_path.is_empty() {
+                                    None
+                                } else {
+                                    Some(output_path.clone())
+                                },
+                            });
+
+                            ConversionProgress {
+                                event_type: "finished".to_string(),
+                                file: Some(file.clone()),
+                                index: Some(*index),
+                                total: None,
+                                markdown: Some(markdown.clone()),
+                                output_path: Some(output_path.clone()),
+                                error: None,
+                                success: None,
+                                failed: None,
+                            }
+                        }
+                        SidecarEvent::Error {
+                            file,
+                            index,
+                            error,
+                        } => {
+                            if let Some(file_path) = file {
+                                results.push(ConversionResult {
+                                    file: file_path.clone(),
+                                    markdown: String::new(),
+                                    error: Some(error.clone()),
+                                    output_path: None,
+                                });
+                            }
+
+                            ConversionProgress {
+                                event_type: "error".to_string(),
+                                file: file.clone(),
+                                index: *index,
+                                total: None,
+                                markdown: None,
+                                output_path: None,
+                                error: Some(error.clone()),
+                                success: None,
+                                failed: None,
+                            }
+                        }
+                        SidecarEvent::Warning {
+                            file,
+                            index,
+                            warning,
+                        } => ConversionProgress {
+                            event_type: "warning".to_string(),
+                            file: Some(file.clone()),
+                            index: Some(*index),
+                            total: None,
+                            markdown: None,
+                            output_path: None,
+                            error: Some(warning.clone()),
+                            success: None,
+                            failed: None,
+                        },
+                        SidecarEvent::Complete {
+                            total,
+                            success,
+                            failed,
+                        } => ConversionProgress {
+                            event_type: "complete".to_string(),
+                            file: None,
+                            index: None,
+                            total: Some(*total),
+                            markdown: None,
+                            output_path: None,
+                            error: None,
+                            success: Some(*success),
+                            failed: Some(*failed),
+                        },
+                    };
+
+                    let _ = app.emit("conversion-progress", &progress);
+                }
+            }
+            CommandEvent::Stderr(bytes) => {
+                let line = String::from_utf8_lossy(&bytes);
+                eprintln!("Sidecar stderr: {}", line);
+            }
+            CommandEvent::Error(err) => {
+                eprintln!("Sidecar error: {}", err);
+            }
+            CommandEvent::Terminated(payload) => {
+                if payload.code != Some(0) {
+                    return Err(format!(
+                        "Sidecar exited with code: {:?}",
+                        payload.code
+                    ));
+                }
+                break;
+            }
+            _ => {}
         }
-
-        let event: SidecarEvent = match serde_json::from_str(&line) {
-            Ok(e) => e,
-            Err(e) => {
-                eprintln!("Failed to parse sidecar event: {} - Line: {}", e, line);
-                continue;
-            }
-        };
-
-        let progress = match &event {
-            SidecarEvent::Started {
-                file,
-                index,
-                total,
-            } => ConversionProgress {
-                event_type: "started".to_string(),
-                file: Some(file.clone()),
-                index: Some(*index),
-                total: Some(*total),
-                markdown: None,
-                output_path: None,
-                error: None,
-                success: None,
-                failed: None,
-            },
-            SidecarEvent::Finished {
-                file,
-                index,
-                markdown,
-                output_path,
-            } => {
-                results.push(ConversionResult {
-                    file: file.clone(),
-                    markdown: markdown.clone(),
-                    error: None,
-                    output_path: if output_path.is_empty() {
-                        None
-                    } else {
-                        Some(output_path.clone())
-                    },
-                });
-
-                ConversionProgress {
-                    event_type: "finished".to_string(),
-                    file: Some(file.clone()),
-                    index: Some(*index),
-                    total: None,
-                    markdown: Some(markdown.clone()),
-                    output_path: Some(output_path.clone()),
-                    error: None,
-                    success: None,
-                    failed: None,
-                }
-            }
-            SidecarEvent::Error {
-                file,
-                index,
-                error,
-            } => {
-                if let Some(file_path) = file {
-                    results.push(ConversionResult {
-                        file: file_path.clone(),
-                        markdown: String::new(),
-                        error: Some(error.clone()),
-                        output_path: None,
-                    });
-                }
-
-                ConversionProgress {
-                    event_type: "error".to_string(),
-                    file: file.clone(),
-                    index: *index,
-                    total: None,
-                    markdown: None,
-                    output_path: None,
-                    error: Some(error.clone()),
-                    success: None,
-                    failed: None,
-                }
-            }
-            SidecarEvent::Warning {
-                file,
-                index,
-                warning,
-            } => ConversionProgress {
-                event_type: "warning".to_string(),
-                file: Some(file.clone()),
-                index: Some(*index),
-                total: None,
-                markdown: None,
-                output_path: None,
-                error: Some(warning.clone()),
-                success: None,
-                failed: None,
-            },
-            SidecarEvent::Complete {
-                total,
-                success,
-                failed,
-            } => ConversionProgress {
-                event_type: "complete".to_string(),
-                file: None,
-                index: None,
-                total: Some(*total),
-                markdown: None,
-                output_path: None,
-                error: None,
-                success: Some(*success),
-                failed: Some(*failed),
-            },
-        };
-
-        let _ = app.emit("conversion-progress", &progress);
-    }
-
-    let status = child
-        .wait()
-        .map_err(|e| format!("Failed to wait for sidecar: {}", e))?;
-
-    if !status.success() {
-        let stderr = child
-            .stderr
-            .take()
-            .map(|mut s| {
-                let mut output = String::new();
-                let _ = std::io::Read::read_to_string(&mut s, &mut output);
-                output
-            })
-            .unwrap_or_default();
-
-        return Err(format!(
-            "Sidecar exited with status: {}. Stderr: {}",
-            status, stderr
-        ));
     }
 
     Ok(results)
