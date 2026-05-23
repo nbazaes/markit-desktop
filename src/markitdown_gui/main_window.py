@@ -294,10 +294,10 @@ class MainWindow(QMainWindow):
                 extract_images=self.settings.extract_images,
             )
 
-            self.conversion_pool.convert(task, {
-                "started": lambda p, fp=file_path: self.file_panel.set_status(fp, "converting"),
-                "finished": self._on_conversion_finished,
-            })
+            self.conversion_pool.convert(task,
+                started=lambda p, fp=file_path: self.file_panel.set_status(fp, "converting"),
+                finished=self._on_conversion_finished,
+            )
 
     def _on_conversion_finished(self, result: ConversionResult):
         self._converting_count += 1

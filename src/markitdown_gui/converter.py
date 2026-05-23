@@ -1,10 +1,10 @@
 import os
-import traceback
+import threading
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Callable
 
-from PySide6.QtCore import QObject, Signal, QRunnable, QThreadPool
+from PySide6.QtCore import QObject, QEvent, QCoreApplication
 
 from markitdown import MarkItDown
 
@@ -25,88 +25,96 @@ class ConversionTask:
     extract_images: bool = True
 
 
-class ConversionWorker(QObject):
-    started = Signal(str)
-    finished = Signal(ConversionResult)
-    progress = Signal(str, int, int)
+_CallbackEventType = QEvent.Type(QEvent.registerEventType())
 
-    def __init__(self):
-        super().__init__()
-        self._cancelled = False
+_handler: Optional[QObject] = None
 
-    def cancel(self):
-        self._cancelled = True
 
-    def run(self, task: ConversionTask):
-        if self._cancelled:
-            return
+def set_handler(obj: QObject):
+    global _handler
+    _handler = obj
 
-        file_path = task.file_path
-        self.started.emit(file_path)
 
-        try:
-            md = MarkItDown()
+class CallbackHandler(QObject):
+    def event(self, e):
+        if e.type() == _CallbackEventType:
+            cb, *args = e.args, e.kwargs
+            if isinstance(cb, tuple):
+                cb, args = cb[0], cb[1:]
+            cb(*args)
+            return True
+        return super().event(e)
 
-            result = md.convert(file_path)
-            markdown = result.text_content
 
-            output_path = None
-            if task.output_directory:
-                os.makedirs(task.output_directory, exist_ok=True)
-                source_name = Path(file_path).stem
-                output_path = os.path.join(task.output_directory, f"{source_name}.md")
-                with open(output_path, "w", encoding="utf-8") as f:
-                    f.write(markdown)
-
-            self.finished.emit(ConversionResult(
-                file_path=file_path,
-                markdown=markdown,
-                output_path=output_path,
-            ))
-
-        except Exception as e:
-            self.finished.emit(ConversionResult(
-                file_path=file_path,
-                error=str(e),
-            ))
+class _CallbackEvent(QEvent):
+    def __init__(self, callback, *args):
+        super().__init__(_CallbackEventType)
+        self.args = (callback, *args)
+        self.kwargs = {}
 
 
 class ConversionPool:
     def __init__(self):
-        self._pool = QThreadPool.globalInstance()
-        self._pool.setMaxThreadCount(4)
-        self._workers: dict[str, ConversionWorker] = {}
+        self._threads: dict[str, threading.Thread] = {}
+        self._cancelled: set = set()
+        self._lock = threading.Lock()
 
-    def convert(self, task: ConversionTask, callbacks: dict):
-        worker = ConversionWorker()
+    def convert(self, task: ConversionTask, started: Callable = None, finished: Callable = None):
+        def _run():
+            file_path = task.file_path
 
-        if "started" in callbacks:
-            worker.started.connect(callbacks["started"])
-        if "finished" in callbacks:
-            worker.finished.connect(callbacks["finished"])
+            with self._lock:
+                if file_path in self._cancelled:
+                    return
 
-        self._workers[task.file_path] = worker
+            if started:
+                self._post(started, file_path)
 
-        runnable = _WorkerRunnable(worker, task)
-        self._pool.start(runnable)
+            try:
+                md = MarkItDown()
+                result = md.convert(file_path)
+                markdown = result.text_content
+
+                output_path = None
+                if task.output_directory:
+                    os.makedirs(task.output_directory, exist_ok=True)
+                    source_name = Path(file_path).stem
+                    output_path = os.path.join(task.output_directory, f"{source_name}.md")
+                    with open(output_path, "w", encoding="utf-8") as f:
+                        f.write(markdown)
+
+                conv_result = ConversionResult(
+                    file_path=file_path,
+                    markdown=markdown,
+                    output_path=output_path,
+                )
+
+            except Exception as e:
+                conv_result = ConversionResult(
+                    file_path=file_path,
+                    error=str(e),
+                )
+
+            if finished:
+                self._post(finished, conv_result)
+
+            with self._lock:
+                self._threads.pop(file_path, None)
+
+        t = threading.Thread(target=_run, daemon=True)
+        with self._lock:
+            self._threads[task.file_path] = t
+        t.start()
+
+    def _post(self, callback, *args):
+        global _handler
+        if _handler and QCoreApplication.instance():
+            QCoreApplication.instance().postEvent(_handler, _CallbackEvent(callback, *args))
 
     def cancel(self, file_path: str):
-        if file_path in self._workers:
-            self._workers[file_path].cancel()
-            del self._workers[file_path]
+        with self._lock:
+            self._cancelled.add(file_path)
 
     def cancel_all(self):
-        for worker in self._workers.values():
-            worker.cancel()
-        self._workers.clear()
-
-
-class _WorkerRunnable(QRunnable):
-    def __init__(self, worker: ConversionWorker, task: ConversionTask):
-        super().__init__()
-        self.worker = worker
-        self.task = task
-        self.setAutoDelete(True)
-
-    def run(self):
-        self.worker.run(self.task)
+        with self._lock:
+            self._cancelled.update(self._threads.keys())
