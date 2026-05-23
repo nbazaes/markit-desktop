@@ -1,10 +1,24 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
+import sys
+
+# Find magika package directory
+magika_dir = None
+for path in sys.path:
+    candidate = os.path.join(path, 'magika')
+    if os.path.isdir(candidate):
+        magika_dir = candidate
+        break
+
+datas = []
+if magika_dir:
+    datas.append((magika_dir, 'magika'))
 
 a = Analysis(
     ['convert.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=datas,
     hiddenimports=[
         'markitdown',
         'markitdown.converters',

@@ -91,6 +91,8 @@
 
 <div
   class="flex flex-col h-full bg-bg-deep"
+  role="region"
+  aria-label="File drop zone"
   on:dragover={handleDragOver}
   on:dragleave={handleDragLeave}
   on:drop={handleDrop}
@@ -126,11 +128,13 @@
     {:else}
       <div class="space-y-1">
         {#each $files as file (file.id)}
-          <button
-            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left
+          <div
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer
                    {$selectedFileId === file.id ? 'bg-bg-raised border border-accent' : 'hover:bg-bg-surface border border-transparent'}"
+            role="button"
+            tabindex="0"
             on:click={() => handleFileClick(file.id)}
-            disabled={$isConverting}
+            on:keypress={(e) => { if (e.key === 'Enter' || e.key === ' ') handleFileClick(file.id); }}
           >
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium text-text-primary truncate">
@@ -149,14 +153,14 @@
               {#if !$isConverting}
                 <button
                   class="text-text-dim hover:text-error transition-colors"
-                  on:click={(e) => handleRemove(e, file.id)}
+                  on:click={(e) => { e.stopPropagation(); handleRemove(e, file.id); }}
                   aria-label="Remove file"
                 >
                   ×
                 </button>
               {/if}
             </div>
-          </button>
+          </div>
         {/each}
       </div>
 

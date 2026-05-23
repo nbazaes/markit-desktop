@@ -1,2 +1,2 @@
-markitdown[all]>=0.1.0
+markitdown[pdf,docx,xlsx,xls,pptx,html,csv,outlook,audio]>=0.1.0
 pyinstaller>=6.0.0

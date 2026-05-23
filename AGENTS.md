@@ -39,7 +39,7 @@ markitdown-gui/
 ├── src/                        # Svelte 5 frontend
 │   ├── App.svelte              # Main layout
 │   ├── main.ts                 # Entry point
-│   ├── app.css                 # Tailwind CSS + theme tokens
+│   ├── app.css                 # Tailwind CSS v4 + theme tokens
 │   └── lib/
 │       ├── components/         # UI components
 │       │   ├── Toolbar.svelte

@@ -4,16 +4,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SIDECAR_DIR="${SCRIPT_DIR}/python-sidecar"
 OUTPUT_DIR="${SCRIPT_DIR}/src-tauri/sidecars"
+VENV_DIR="${SCRIPT_DIR}/.venv"
 
 echo "Building Python sidecar..."
 
 cd "${SIDECAR_DIR}"
 
+# Use venv pip if available, otherwise system pip
+if [ -f "${VENV_DIR}/bin/pip" ]; then
+    PIP="${VENV_DIR}/bin/pip"
+    PYTHON="${VENV_DIR}/bin/python"
+elif command -v pip &> /dev/null; then
+    PIP="pip"
+    PYTHON="python3"
+else
+    echo "Error: pip not found"
+    exit 1
+fi
+
 echo "Installing dependencies..."
-pip install -r requirements.txt
+${PIP} install -r requirements.txt
 
 echo "Building with PyInstaller..."
-pyinstaller convert.spec --clean
+${PYTHON} -m PyInstaller convert.spec --clean
 
 mkdir -p "${OUTPUT_DIR}"
 
