@@ -1,4 +1,4 @@
-# MarkItDown GUI
+# MarkIt-Desktop
 
 A modern cross-platform desktop GUI for [MarkItDown](https://github.com/microsoft/markitdown), the file-to-Markdown converter by Microsoft.
 
