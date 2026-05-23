@@ -1,13 +1,33 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
+import site
+
+site_packages = site.getsitepackages()[0]
+user_site = site.getusersitepackages()
+
+# Check venv site-packages first, then user site
+venv_site = os.path.join(os.environ.get('VIRTUAL_ENV', ''), 'lib', 'python3.14', 'site-packages')
+if not os.path.isdir(venv_site):
+    for sp in site.getsitepackages():
+        if os.path.isdir(os.path.join(sp, 'markitdown')):
+            venv_site = sp
+            break
 
 # Find magika package directory
 magika_dir = None
-for path in sys.path:
+for path in sys.path + [venv_site]:
     candidate = os.path.join(path, 'magika')
     if os.path.isdir(candidate):
         magika_dir = candidate
+        break
+
+# Find markitdown package directory for data files
+markitdown_dir = None
+for path in sys.path + [venv_site]:
+    candidate = os.path.join(path, 'markitdown')
+    if os.path.isdir(candidate):
+        markitdown_dir = candidate
         break
 
 datas = []
@@ -16,7 +36,7 @@ if magika_dir:
 
 a = Analysis(
     ['convert.py'],
-    pathex=[],
+    pathex=[venv_site],
     binaries=[],
     datas=datas,
     hiddenimports=[
