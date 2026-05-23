@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QToolBar, QStatusBar, QLabel,
     QToolButton, QFileDialog, QProgressBar, QMessageBox,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, QSize, QByteArray
 from PySide6.QtGui import QAction, QKeySequence
@@ -115,9 +116,15 @@ class MainWindow(QMainWindow):
         self.clear_btn.setEnabled(False)
         toolbar.addWidget(self.clear_btn)
 
-        toolbar.addStretch()
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        toolbar.addWidget(spacer)
 
-        output_layout = QHBoxLayout()
+        output_widget = QWidget()
+        output_layout = QHBoxLayout(output_widget)
+        output_layout.setContentsMargins(0, 0, 0, 0)
+        output_layout.setSpacing(8)
+
         output_label = QLabel("Output:")
         output_label.setStyleSheet("color: #6c6c80; font-size: 12px;")
         output_layout.addWidget(output_label)
@@ -134,8 +141,7 @@ class MainWindow(QMainWindow):
         )
         output_layout.addWidget(self.output_path_label)
 
-        toolbar.addWidget(QWidget())
-        toolbar.widgetForAction(toolbar.actions()[-1]).setLayout(output_layout)
+        toolbar.addWidget(output_widget)
 
     def _create_central_widget(self):
         central = QWidget()
