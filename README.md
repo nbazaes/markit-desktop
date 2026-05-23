@@ -12,7 +12,7 @@ Convert PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, HTML
 - **Raw Markdown view** — Toggle between rendered preview and raw Markdown
 - **Auto-save** — Optionally save converted Markdown to a directory automatically
 - **Clipboard support** — Copy converted Markdown to clipboard
-- **Dark & Light themes** — Switch with `Ctrl+T`
+- **Dark & Light themes** — Switch with a click
 - **Cross-platform** — Linux, Windows, and macOS
 
 ## Supported Formats
@@ -33,13 +33,6 @@ Convert PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, HTML
 
 ## Installation
 
-### pip (any OS with Python 3.10+)
-
-```bash
-pip install markit-desktop
-markit-desktop
-```
-
 ### Linux
 
 | Format | Command |
@@ -51,7 +44,7 @@ markit-desktop
 
 ### Windows
 
-Download the `.exe` from [Releases](https://github.com/microsoft/markitdown/releases) and run — no installation required.
+Download the `.exe` installer from [Releases](https://github.com/microsoft/markitdown/releases) and run.
 
 ### macOS
 
@@ -59,28 +52,40 @@ Download the `.dmg` from [Releases](https://github.com/microsoft/markitdown/rele
 
 ## Building from Source
 
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v18+)
+- [Rust](https://www.rust-lang.org/tools/install) (v1.70+)
+- [Python](https://www.python.org/) (v3.10+)
+- [Tauri system dependencies](https://v2.tauri.app/start/prerequisites/)
+
+### Steps
+
 ```bash
 git clone https://github.com/microsoft/markitdown.git
-cd markitdown
-pip install -e "markitdown[all]"
+cd markitdown-gui
 
-cd ../markitdown-gui
-pip install -e .
-markit-desktop
-```
+# Install frontend dependencies
+npm install
 
-### Standalone Binary
+# Build the Python sidecar
+./build-sidecar.sh
 
-```bash
-pip install pyinstaller
-pyinstaller build/pyinstaller.spec
+# Run in development mode
+npm run tauri dev
+
+# Build production binary
+npm run tauri build
 ```
 
 ## Tech Stack
 
-- **[PySide6](https://wiki.qt.io/Qt_for_Python)** — Qt for Python, providing native look on all platforms
+- **[Tauri v2](https://v2.tauri.app/)** — Cross-platform desktop app framework
+- **[Svelte 5](https://svelte.dev/)** — Frontend framework
+- **[Tailwind CSS v4](https://tailwindcss.com/)** — Utility-first CSS
 - **[MarkItDown](https://github.com/microsoft/markitdown)** — File-to-Markdown conversion engine
-- **[Markdown](https://python-markdown.github.io/)** — Markdown to HTML renderer for preview
+- **[marked](https://marked.js.org/)** — Markdown to HTML renderer
+- **[highlight.js](https://highlightjs.org/)** — Syntax highlighting
 
 ## License
 

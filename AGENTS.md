@@ -2,64 +2,110 @@
 
 ## Project overview
 
-A cross-platform **desktop GUI** (PySide6 / Qt) that wraps Microsoft's [MarkItDown](https://github.com/microsoft/markitdown) file-to-Markdown converter. This is **not a CLI tool** — the UI depends on a running Qt event loop.
+A cross-platform **desktop GUI** (Tauri v2 / Svelte 5 / Rust) that wraps Microsoft's [MarkItDown](https://github.com/microsoft/markitdown) file-to-Markdown converter via a Python sidecar process.
 
 ## Package naming
 
-- PyPI name / CLI command: `markit-desktop` (hyphen)
-- Python import name: `markit_desktop` (underscore)
-- Version source (hatchling dynamic): `src/markit_desktop/__about__.py`
+- App name: `MarkIt-Desktop`
+- npm package: `markit-desktop`
+- Tauri identifier: `com.markitdesktop.app`
 
 ## Dev commands
 
 ```bash
-# Install in editable mode with all optional deps
-pip install -e ".[full]"
-# Or via requirements.txt (includes PyInstaller)
-pip install -r requirements.txt
+# Install frontend dependencies
+npm install
 
-# Run the GUI
-markit-desktop
-# Or directly:
-python -m markit_desktop
+# Build the Python sidecar (required before running)
+./build-sidecar.sh
 
-# Build standalone binary (PyInstaller)
-pyinstaller build/pyinstaller.spec
+# Run in development mode (hot reload for frontend + Rust)
+npm run tauri dev
 
-# Build Linux packages (AppImage/deb/rpm)
-bash build/packages/AppImage/build.sh
-bash build/packages/deb/build.sh
-bash build/packages/rpm/build.sh
+# Type-check frontend
+npm run check
+
+# Check Rust compilation
+cd src-tauri && cargo check
+
+# Build production binary
+npm run tauri build
 ```
 
 ## Architecture
 
 ```
-src/markit_desktop/
-├── __main__.py       # entry point: QApplication + MainWindow
-├── __about__.py      # version (read by hatchling at build time)
-├── main_window.py    # main UI: toolbar, splitter, conversion orchestration
-├── file_panel.py     # left panel: file list, drag & drop
-├── preview_panel.py  # right panel: rendered preview + raw markdown tabs
-├── converter.py      # ConversionPool: threaded conversions, Qt event bridge
-├── settings.py       # QSettings persistence (singleton)
-└── resources/
-    └── styles.qss    # dark theme stylesheet
+markitdown-gui/
+├── src/                        # Svelte 5 frontend
+│   ├── App.svelte              # Main layout
+│   ├── main.ts                 # Entry point
+│   ├── app.css                 # Tailwind CSS + theme tokens
+│   └── lib/
+│       ├── components/         # UI components
+│       │   ├── Toolbar.svelte
+│       │   ├── FilePanel.svelte
+│       │   ├── PreviewPanel.svelte
+│       │   └── StatusBar.svelte
+│       └── stores/             # Svelte stores (state management)
+│           ├── files.ts
+│           ├── conversion.ts
+│           └── settings.ts
+├── src-tauri/                  # Rust backend
+│   ├── src/
+│   │   ├── main.rs             # Entry point
+│   │   ├── lib.rs              # App setup, command registration
+│   │   ├── commands.rs         # IPC commands
+│   │   ├── converter.rs        # Sidecar process management
+│   │   └── settings.rs         # JSON config persistence
+│   ├── Cargo.toml
+│   ├── tauri.conf.json
+│   ├── capabilities/           # Tauri permissions
+│   └── sidecars/               # Platform-specific Python binaries
+├── python-sidecar/             # Python conversion sidecar
+│   ├── convert.py              # CLI wrapper: stdin JSON → stdout JSON
+│   ├── convert.spec            # PyInstaller spec
+│   └── requirements.txt
+├── build-sidecar.sh            # Sidecar build script
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+└── svelte.config.js
 ```
 
-Key design points:
-- **Threading**: file conversions run in daemon threads (`ConversionPool`). Results are posted back to the Qt main thread via a custom `QEvent` bridge (`CallbackHandler`).
-- **Settings**: uses `QSettings("MarkItDesktop", "MarkItDesktop")` for persistent config (window geometry, output dir, theme, OCR toggle).
-- **Themes**: dark theme loaded from `resources/styles.qss`; light theme is inline CSS in `main_window.py`. Toggle with `Ctrl+T`.
+### Key design points
+
+- **Frontend**: Svelte 5 with TypeScript, Tailwind CSS v4 for styling. State managed via Svelte stores (`$lib/stores/`).
+- **Backend**: Rust (Tauri v2). Handles sidecar process management, settings persistence, file dialogs, and IPC.
+- **Sidecar**: Python binary built with PyInstaller. Communicates via stdin/stdout using line-delimited JSON events.
+- **IPC**: Frontend calls Rust commands via `@tauri-apps/api/core` `invoke()`. Rust emits events via `app.emit()` for progress updates.
+- **Settings**: JSON file stored in app config directory (`~/.config/markit-desktop/settings.json` on Linux).
+- **Themes**: Dark (default) and light themes via CSS custom properties. Toggle with button in toolbar.
 - **The `markitdown/` subdirectory** is a nested git repository (the MarkItDown library), not a submodule. It is untracked in the parent repo.
+
+### IPC commands (Rust → Frontend)
+
+| Command | Description |
+|---------|-------------|
+| `convert_files` | Start batch conversion via sidecar |
+| `get_settings` | Load app settings |
+| `set_settings` | Save app settings |
+| `select_output_dir` | Open native folder picker |
+| `save_markdown` | Open native save dialog and write file |
+
+### Events (Rust → Frontend)
+
+| Event | Description |
+|-------|-------------|
+| `conversion-progress` | Progress updates during conversion (started/finished/error/complete) |
 
 ## Build & CI
 
-- Build backend: `hatchling`
-- `build/` and `dist/` are gitignored **except** `build/packages/` and `build/pyinstaller.spec`
-- CI (`release.yml`): triggered on `v*` tags. Builds AppImage, deb, rpm (Linux), .exe (Windows), .dmg (macOS)
-- Hidden imports in `pyinstaller.spec` must be kept in sync with actual converter modules used
+- Frontend build: Vite (`npm run build`)
+- Rust build: Cargo via Tauri CLI (`npm run tauri build`)
+- Sidecar build: PyInstaller (`./build-sidecar.sh`)
+- CI (`release.yml`): triggered on `v*` tags. Builds sidecar per platform, then Tauri bundles for all targets.
+- Sidecar binaries are **not** committed — they are built by CI and copied into `src-tauri/sidecars/` before Tauri build.
 
 ## No tests or linters
 
-This repo has no test suite, no pre-commit hooks, and no lint/formatter/typecheck config. Add tooling before relying on it.
+This repo has no test suite, no pre-commit hooks, and no lint/formatter/typecheck config. Use `npm run check` for TypeScript and `cargo check` for Rust.

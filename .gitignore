@@ -1,5 +1,53 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 dist/
 target/
+src-tauri/target/
+src-tauri/gen/
+
+# Python sidecar build artifacts
+python-sidecar/build/
+python-sidecar/dist/
+python-sidecar/*.spec.bak
+python-sidecar/__pycache__/
+python-sidecar/*.pyc
+
+# Sidecar binaries (built by CI, not committed)
+src-tauri/sidecars/*
+!src-tauri/sidecars/.gitkeep
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

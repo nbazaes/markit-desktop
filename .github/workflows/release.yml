@@ -5,28 +5,24 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version tag (e.g., v0.1.0)'
-        required: true
-        default: 'v0.1.0'
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build-sidecar:
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - format: AppImage
-            script: build/packages/AppImage/build.sh
-            artifact: MarkIt-Desktop-*.AppImage
-          - format: deb
-            script: build/packages/deb/build.sh
-            artifact: markit-desktop_*.deb
-          - format: rpm
-            script: build/packages/rpm/build.sh
-            artifact: markit-desktop-*.rpm
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            sidecar-name: markit-convert-x86_64-unknown-linux-gnu
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            sidecar-name: markit-convert-x86_64-pc-windows-msvc.exe
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            sidecar-name: markit-convert-aarch64-apple-darwin
 
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,97 +31,107 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install sidecar dependencies
         run: |
+          cd python-sidecar
           pip install -r requirements.txt
 
-      - name: Build ${{ matrix.format }}
+      - name: Build sidecar (Linux/macOS)
+        if: matrix.platform != 'windows-latest'
         run: |
-          bash ${{ matrix.script }}
-        env:
-          VERSION: ${{ github.ref_name }}
+          cd python-sidecar
+          pyinstaller convert.spec --clean
+          mkdir -p ../src-tauri/sidecars
+          cp dist/markit-convert ../src-tauri/sidecars/${{ matrix.sidecar-name }}
+          chmod +x ../src-tauri/sidecars/${{ matrix.sidecar-name }}
 
-      - name: Upload ${{ matrix.format }} artifact
+      - name: Build sidecar (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          cd python-sidecar
+          pyinstaller convert.spec --clean
+          mkdir -p ../src-tauri/sidecars
+          cp dist/markit-convert.exe ../src-tauri/sidecars/${{ matrix.sidecar-name }}
+
+      - name: Upload sidecar artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.format }}
-          path: ${{ matrix.artifact }}
+          name: sidecar-${{ matrix.target }}
+          path: src-tauri/sidecars/${{ matrix.sidecar-name }}
 
-  build-windows:
-    runs-on: windows-latest
+  build-tauri:
+    needs: build-sidecar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: ''
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: ''
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: '--target aarch64-apple-darwin'
+
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.12'
+          node-version: 20
+          cache: 'npm'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build executable
-        run: |
-          pyinstaller build/pyinstaller.spec
-
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          name: Windows-exe
-          path: dist/markit-desktop.exe
+          targets: ${{ matrix.target }}
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Build .app bundle
-        run: |
-          pyinstaller build/pyinstaller.spec
-
-      - name: Create DMG
-        run: |
-          mkdir -p dmg
-          cp -R dist/markit-desktop.app dmg/
-          hdiutil create -volname "MarkIt-Desktop" -srcfolder dmg -ov -format UDZO "markit-desktop.dmg"
-
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macOS-dmg
-          path: markit-desktop.dmg
-
-  release:
-    needs: [build-linux, build-windows, build-macos]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download all artifacts
+      - name: Download sidecar (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
         uses: actions/download-artifact@v4
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          draft: false
+          name: sidecar-x86_64-unknown-linux-gnu
+          path: src-tauri/sidecars/
+
+      - name: Download sidecar (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: sidecar-x86_64-pc-windows-msvc
+          path: src-tauri/sidecars/
+
+      - name: Download sidecar (macOS)
+        if: matrix.platform == 'macos-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: sidecar-aarch64-apple-darwin
+          path: src-tauri/sidecars/
+
+      - name: Make sidecar executable (Linux/macOS)
+        if: matrix.platform != 'windows-latest'
+        run: chmod +x src-tauri/sidecars/*
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'MarkIt-Desktop v__VERSION__'
+          releaseBody: 'See the assets to download and install this version.'
+          releaseDraft: true
           prerelease: false
-          files: |
-            AppImage/*.AppImage
-            deb/*.deb
-            rpm/*.rpm
-            Windows-exe/*.exe
-            macOS-dmg/*.dmg
+          args: ${{ matrix.args }}

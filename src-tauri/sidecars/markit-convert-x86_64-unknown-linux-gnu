@@ -1,4 +1,0 @@
-#!/bin/bash
-# Placeholder sidecar - replace with actual Python binary
-echo '{"event": "error", "error": "Sidecar not built yet. Run: cd python-sidecar && pyinstaller convert.spec"}'
-exit 1
