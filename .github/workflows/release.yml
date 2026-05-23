@@ -1,0 +1,131 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - format: AppImage
+            script: build/packages/AppImage/build.sh
+            artifact: markitdown-gui-*.AppImage
+          - format: deb
+            script: build/packages/deb/build.sh
+            artifact: markitdown-gui_*.deb
+          - format: rpm
+            script: build/packages/rpm/build.sh
+            artifact: markitdown-gui-*.rpm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Build ${{ matrix.format }}
+        run: |
+          bash ${{ matrix.script }}
+        env:
+          VERSION: ${{ github.ref_name }}
+
+      - name: Upload ${{ matrix.format }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.format }}
+          path: ${{ matrix.artifact }}
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller build/pyinstaller.spec
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-exe
+          path: dist/markitdown-gui.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build .app bundle
+        run: |
+          pyinstaller build/pyinstaller.spec
+
+      - name: Create DMG
+        run: |
+          mkdir -p dmg
+          cp -R dist/markitdown-gui.app dmg/
+          hdiutil create -volname "MarkItDown GUI" -srcfolder dmg -ov -format UDZO "markitdown-gui.dmg"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-dmg
+          path: markitdown-gui.dmg
+
+  release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            AppImage/*.AppImage
+            deb/*.deb
+            rpm/*.rpm
+            Windows-exe/*.exe
+            macOS-dmg/*.dmg

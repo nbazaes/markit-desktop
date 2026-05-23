@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "markitdown-gui"
+dynamic = ["version"]
+description = "Modern cross-platform GUI for MarkItDown file-to-Markdown converter"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "MarkItDown GUI Contributors" },
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+dependencies = [
+  "PySide6>=6.6.0",
+  "markitdown[all]>=0.1.0",
+  "markdown>=3.5.0",
+  "Pygments>=2.17.0",
+]
+
+[project.scripts]
+markitdown-gui = "markitdown_gui.__main__:main"
+
+[project.gui-scripts]
+markitdown-guiw = "markitdown_gui.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/microsoft/markitdown"
+Repository = "https://github.com/microsoft/markitdown"
+
+[tool.hatch.version]
+path = "src/markitdown_gui/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/markitdown_gui"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/build/pyinstaller.spec",
+]
