@@ -22,6 +22,7 @@ pub fn run() {
             commands::get_settings,
             commands::set_settings,
             commands::select_output_dir,
+            commands::save_markdown,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
