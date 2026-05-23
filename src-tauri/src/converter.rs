@@ -75,6 +75,7 @@ pub async fn run_conversion(
 ) -> Result<Vec<ConversionResult>, String> {
     let input_json = serde_json::to_string(&input)
         .map_err(|e| format!("Failed to serialize input: {}", e))?;
+    log::info!("Starting conversion for {} files", input.files.len());
 
     let shell = app.shell();
     let sidecar = shell
@@ -85,9 +86,14 @@ pub async fn run_conversion(
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 
+    log::info!("Sidecar spawned, writing {} bytes to stdin", input_json.len());
+
     child
         .write(input_json.as_bytes())
         .map_err(|e| format!("Failed to write to sidecar stdin: {}", e))?;
+
+    drop(child);
+    log::info!("Stdin closed, waiting for sidecar output");
 
     let mut results = Vec::new();
     let buffer = Mutex::new(String::new());
@@ -110,7 +116,7 @@ pub async fn run_conversion(
                     let event: SidecarEvent = match serde_json::from_str(&line_str) {
                         Ok(e) => e,
                         Err(e) => {
-                            eprintln!("Failed to parse sidecar event: {} - Line: {}", e, line_str);
+                            log::warn!("Failed to parse sidecar event: {} - Line: {}", e, line_str);
                             continue;
                         }
                     };
@@ -223,10 +229,10 @@ pub async fn run_conversion(
             }
             CommandEvent::Stderr(bytes) => {
                 let line = String::from_utf8_lossy(&bytes);
-                eprintln!("Sidecar stderr: {}", line);
+                log::warn!("Sidecar stderr: {}", line);
             }
             CommandEvent::Error(err) => {
-                eprintln!("Sidecar error: {}", err);
+                log::error!("Sidecar error: {}", err);
             }
             CommandEvent::Terminated(payload) => {
                 if payload.code != Some(0) {

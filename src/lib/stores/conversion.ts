@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { files, updateFileStatus } from './files';
@@ -17,6 +17,8 @@ export interface ConversionProgress {
 
 export const isConverting = writable(false);
 export const currentProgress = writable<ConversionProgress | null>(null);
+
+const pathToId = new Map<string, string>();
 
 export const progressPercent = derived(
   currentProgress,
@@ -51,20 +53,20 @@ export async function setupConversionListener() {
     currentProgress.set(progress);
 
     if (progress.file) {
-      const fileId = progress.file;
+      const fileId = pathToId.get(progress.file);
       
       switch (progress.eventType) {
         case 'started':
-          updateFileStatus(fileId, 'converting');
+          if (fileId) updateFileStatus(fileId, 'converting');
           break;
         case 'finished':
-          updateFileStatus(fileId, 'completed', {
+          if (fileId) updateFileStatus(fileId, 'completed', {
             markdown: progress.markdown,
             outputPath: progress.outputPath
           });
           break;
         case 'error':
-          updateFileStatus(fileId, 'error', {
+          if (fileId) updateFileStatus(fileId, 'error', {
             error: progress.error
           });
           break;
@@ -73,6 +75,7 @@ export async function setupConversionListener() {
 
     if (progress.eventType === 'complete') {
       isConverting.set(false);
+      pathToId.clear();
     }
   });
 }
@@ -80,21 +83,20 @@ export async function setupConversionListener() {
 export async function startConversion(outputDir?: string) {
   isConverting.set(true);
   currentProgress.set(null);
+  pathToId.clear();
 
   try {
-    // Get all pending files
-    const filesStore = files;
-    let pendingFiles: { id: string; path: string }[] = [];
-    
-    filesStore.subscribe(value => {
-      pendingFiles = value
-        .filter(f => f.status === 'pending' || f.status === 'error')
-        .map(f => ({ id: f.id, path: f.path }));
-    })();
+    const currentFiles = get(files);
+    let pendingFiles = currentFiles
+      .filter(f => f.status === 'pending' || f.status === 'error');
 
     if (pendingFiles.length === 0) {
       isConverting.set(false);
       return;
+    }
+
+    for (const f of pendingFiles) {
+      pathToId.set(f.path, f.id);
     }
 
     const filePaths = pendingFiles.map(f => f.path);
@@ -108,6 +110,7 @@ export async function startConversion(outputDir?: string) {
   } catch (error) {
     console.error('Conversion failed:', error);
     isConverting.set(false);
+    pathToId.clear();
   }
 }
 

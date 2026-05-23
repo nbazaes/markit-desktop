@@ -3,14 +3,15 @@
   "identifier": "default",
   "description": "Default capability for the main window",
   "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "dialog:default",
-    "shell:allow-open",
-    "shell:allow-execute",
-    "shell:allow-spawn",
-    "shell:allow-stdin-write",
-    "shell:allow-kill",
-    "fs:default"
-  ]
+"permissions": [
+        "core:default",
+        "dialog:default",
+        "log:default",
+        "shell:allow-open",
+        "shell:allow-execute",
+        "shell:allow-spawn",
+        "shell:allow-stdin-write",
+        "shell:allow-kill",
+        "fs:default"
+    ]
 }
