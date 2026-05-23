@@ -13,6 +13,7 @@ pub struct ConversionInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConversionResult {
     pub file: String,
     pub markdown: String,
@@ -57,6 +58,7 @@ pub enum SidecarEvent {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConversionProgress {
     pub event_type: String,
     pub file: Option<String>,
@@ -235,6 +237,7 @@ pub async fn run_conversion(
                 log::error!("Sidecar error: {}", err);
             }
             CommandEvent::Terminated(payload) => {
+                log::info!("Sidecar terminated with code: {:?}", payload.code);
                 if payload.code != Some(0) {
                     return Err(format!(
                         "Sidecar exited with code: {:?}",
