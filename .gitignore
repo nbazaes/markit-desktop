@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 dist/
+build/
 *.AppImage
 *.deb
 *.rpm
@@ -13,3 +14,7 @@ dist/
 venv/
 .DS_Store
 Thumbs.db
+
+# Keep packaging scripts
+!build/packages/
+!build/pyinstaller.spec
