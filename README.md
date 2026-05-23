@@ -4,6 +4,18 @@ A modern cross-platform desktop GUI for [MarkItDown](https://github.com/microsof
 
 Convert PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, HTML, images, audio, EPUBs, and more to clean Markdown — all through a clean, intuitive interface.
 
+### 🚧 Current Status: Active Development
+
+This repository is currently a **Proof of Concept (PoC) / Work in Progress**.
+
+- [x] UI/UX Mockup designed
+- [x] Frontend boilerplate set up (Tauri + Svelte)
+- [ ] Backend core integration (MarkItDown Python wrapper / Bridge)
+- [ ] File Drag & Drop functionality
+- [ ] Production release
+
+*Note: The conversion button and file processing are not functional yet. Stay tuned for the first alpha release!*
+
 ## Features
 
 - **Drag & drop** — Drop files or folders directly into the app
