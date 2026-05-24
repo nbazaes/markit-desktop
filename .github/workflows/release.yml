@@ -50,8 +50,8 @@ jobs:
         run: |
           cd python-sidecar
           pyinstaller convert.spec --clean
-          mkdir -p ../src-tauri/sidecars
-          cp dist/markit-convert.exe ../src-tauri/sidecars/${{ matrix.sidecar-name }}
+          New-Item -ItemType Directory -Force -Path ../src-tauri/sidecars
+          Copy-Item dist/markit-convert.exe ../src-tauri/sidecars/${{ matrix.sidecar-name }}
 
       - name: Upload sidecar artifact
         uses: actions/upload-artifact@v4
