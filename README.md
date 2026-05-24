@@ -40,7 +40,6 @@ Convert PDFs, Word documents, Excel spreadsheets, PowerPoint presentations, HTML
 | **AppImage** | Download from [Releases](https://github.com/microsoft/markitdown/releases), `chmod +x` and run |
 | **Debian/Ubuntu** | `sudo dpkg -i markit-desktop_*.deb` |
 | **Fedora/RHEL** | `sudo rpm -i markit-desktop-*.rpm` |
-| **Arch (AUR)** | `yay -S markit-desktop` |
 
 ### Windows
 
