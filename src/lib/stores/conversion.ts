@@ -70,6 +70,11 @@ export async function setupConversionListener() {
             error: progress.error
           });
           break;
+        case 'warning':
+          if (fileId) updateFileStatus(fileId, 'warning', {
+            error: progress.error
+          });
+          break;
       }
     }
 

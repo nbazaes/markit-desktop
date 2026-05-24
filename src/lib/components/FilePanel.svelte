@@ -73,6 +73,7 @@
       case 'pending': return '○';
       case 'converting': return '⟳';
       case 'completed': return '✓';
+      case 'warning': return '⚠';
       case 'error': return '✗';
       default: return '○';
     }
@@ -83,6 +84,7 @@
       case 'pending': return 'text-text-muted';
       case 'converting': return 'text-warning animate-spin';
       case 'completed': return 'text-success';
+      case 'warning': return 'text-warning';
       case 'error': return 'text-error';
       default: return 'text-text-muted';
     }
@@ -141,7 +143,7 @@
                 {file.name}
               </div>
               {#if file.error}
-                <div class="text-xs text-error truncate mt-0.5">
+                <div class="text-xs {file.status === 'warning' ? 'text-warning' : 'text-error'} truncate mt-0.5">
                   {file.error}
                 </div>
               {/if}

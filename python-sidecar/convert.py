@@ -77,6 +77,16 @@ def convert_files(input_data: dict):
             result = converter.convert(file_path)
             markdown = result.text_content
 
+            # Check if conversion produced no extractable content
+            if not markdown.strip():
+                emit_event({
+                    "event": "warning",
+                    "file": file_path,
+                    "index": index,
+                    "warning": "No extractable content found"
+                })
+                continue
+
             # Optionally save to output directory
             output_path = ""
             if output_dir:

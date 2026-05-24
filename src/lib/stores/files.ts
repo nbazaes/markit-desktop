@@ -5,7 +5,7 @@ export interface FileItem {
   path: string;
   name: string;
   size: number;
-  status: 'pending' | 'converting' | 'completed' | 'error';
+  status: 'pending' | 'converting' | 'completed' | 'error' | 'warning';
   error?: string;
   markdown?: string;
   outputPath?: string;
