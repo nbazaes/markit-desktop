@@ -35,7 +35,7 @@
 
   function getOutputDisplay(): string {
     if (!$settings.output_directory) return 'Output folder...';
-    const parts = $settings.output_directory.split('/');
+    const parts = $settings.output_directory.split(/[/\\]/);
     return parts[parts.length - 1] || 'Output folder...';
   }
 </script>
