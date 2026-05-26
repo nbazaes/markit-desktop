@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_shell::process::CommandEvent;
@@ -75,9 +76,57 @@ pub async fn run_conversion(
     app: AppHandle,
     input: ConversionInput,
 ) -> Result<Vec<ConversionResult>, String> {
-    let input_json = serde_json::to_string(&input)
+    let mut valid_files: Vec<String> = Vec::new();
+    let mut failed_count: usize = 0;
+
+    for (index, file_path) in input.files.iter().enumerate() {
+        let path = Path::new(file_path);
+        if !path.exists() {
+            log::warn!("File not found: {}", file_path);
+            let progress = ConversionProgress {
+                event_type: "error".to_string(),
+                file: Some(file_path.clone()),
+                index: Some(index),
+                total: Some(input.files.len()),
+                markdown: None,
+                output_path: None,
+                error: Some(format!("No such file or directory: '{}'", file_path)),
+                success: None,
+                failed: None,
+            };
+            let _ = app.emit("conversion-progress", &progress);
+            failed_count += 1;
+        } else {
+            valid_files.push(file_path.clone());
+        }
+    }
+
+    if valid_files.is_empty() {
+        let progress = ConversionProgress {
+            event_type: "complete".to_string(),
+            file: None,
+            index: None,
+            total: Some(input.files.len()),
+            markdown: None,
+            output_path: None,
+            error: None,
+            success: Some(0),
+            failed: Some(failed_count),
+        };
+        let _ = app.emit("conversion-progress", &progress);
+        return Ok(Vec::new());
+    }
+
+    let validated_input = ConversionInput {
+        files: valid_files,
+        output_dir: input.output_dir,
+        use_ocr: input.use_ocr,
+        extract_images: input.extract_images,
+    };
+
+    let input_json = serde_json::to_string(&validated_input)
         .map_err(|e| format!("Failed to serialize input: {}", e))?;
-    log::info!("Starting conversion for {} files", input.files.len());
+    log::info!("Starting conversion for {} files ({} skipped)", validated_input.files.len(), failed_count);
 
     let shell = app.shell();
     let sidecar = shell
