@@ -1,6 +1,6 @@
 {
   "productName": "MarkIt-Desktop",
-  "version": "0.2.0",
+  "version": "0.2.1-alpha",
   "identifier": "com.markitdesktop.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "nsis", "msi", "app", "dmg"],
+    "targets": ["deb", "rpm", "nsis", "app", "dmg"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
