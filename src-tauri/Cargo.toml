@@ -1,6 +1,6 @@
 [package]
 name = "markit-desktop"
-version = "0.2.0"
+version = "0.2.1-alpha"
 description = "Modern cross-platform GUI for MarkItDown file-to-Markdown converter"
 authors = ["MarkIt-Desktop Contributors"]
 edition = "2021"
